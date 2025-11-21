@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoPath | Waste Dashboard</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- 🔥 ADD HEATMAP LIBRARY -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+:root {
+  --bg:#f3f6f5; --text-main:#00221c; --primary:#006e55; --primary-light:#00a676;
+  --card-bg:#ffffff; --border:#d0d8d6; --shadow:rgba(0,0,0,0.1);
+}
+[data-theme="dark"] {
+  --bg:#0e141a; --text-main:#f1f3f2; --primary:#00c48c; --primary-light:#00ffb0;
+  --card-bg:#121c25; --border:#22313b; --shadow:rgba(0,0,0,0.6);
+}
+*{margin:0;padding:0;box-sizing:border-box;transition:.2s}
+body{font-family:Poppins,sans-serif;background:var(--bg);color:var(--text-main);overflow-x:hidden}
+
+header{position:fixed;top:0;width:100%;background:var(--card-bg);padding:1rem 8%;
+display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 10px var(--shadow);z-index:100}
+.LOGO{font-size:1.6rem;color:var(--primary);font-weight:700;text-decoration:none}
+nav a{margin:0 1rem;color:var(--text-main);text-decoration:none;font-weight:500}
+nav a:hover{color:var(--primary-light)}
+select{background:var(--primary);color:#fff;padding:8px 14px;border:none;border-radius:8px;font-weight:600;margin-left:6px}
+
+.switch{font-size:17px;position:relative;display:inline-block;width:3.5em;height:2em;margin-left:1rem;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{--background:#b8b6b6;position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:var(--background);transition:.5s;border-radius:25px;}
+.slider:before{position:absolute;content:"";height:1.4em;width:1.4em;border-radius:50%;left:10%;bottom:15%;box-shadow: inset 8px -4px 0px 0px #fff000;background:var(--background);transition:.5s;}
+input:checked + .slider{background-color:#1a6249;}
+input:checked + .slider:before{transform:translateX(100%);box-shadow: inset 15px -4px 0px 15px #fff000;}
+
+.hero{text-align:center;padding:7rem 1rem 3rem}
+.hero h1{font-size:2.3rem;color:var(--primary);margin-bottom:.3rem}
+
+.dashboard{padding:4rem 8%;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+.kpi{background:var(--card-bg);padding:1.2rem;border-radius:14px;box-shadow:0 4px 12px var(--shadow);text-align:center}
+.kpi h4{color:var(--primary-light);font-size:.9rem}
+.kpi p{font-size:1.3rem;font-weight:600}
+
+.chart-area{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:1.8rem}
+.chart-box{background:var(--card-bg);padding:1.2rem;border-radius:14px;box-shadow:0 4px 12px var(--shadow)}
+#map{height:70vh;width:90%;margin:3rem auto;border-radius:14px;
+box-shadow:0 6px 20px var(--shadow);border:2px solid var(--border)}
+
+.table-wrapper{
+  background:var(--card-bg);
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 4px 12px var(--shadow);
+  overflow-x:auto;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+}
+
+th{
+  background:var(--primary);
+  color:#fff;
+  padding:12px;
+  font-weight:600;
+  text-align:left;
+}
+
+td{
+  padding:12px;
+  border-bottom:1px solid var(--border);
+  vertical-align:middle;
+  font-size:0.95rem;
+}
+
+.pic-btn,.accept-btn,.done-btn{
+  padding:6px 12px;
+  border:none;
+  border-radius:6px;
+  font-weight:600;
+  cursor:pointer;
+  color:#fff;
+}
+.pic-btn{background:#00a676;}
+.accept-btn{background:#009e60;}
+.done-btn{background:#007bff;}
+
+/* PHOTO MODAL */
+#photoModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(6px);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+#photoModal img {
+  max-width: 50rem;
+  max-height: auto;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+
+#photoModalClose {
+  position: absolute;
+  top: 30px;
+  right: 40px;
+  font-size: 45px;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#photoModalClose:hover {
+  color: #00ffb0;
+}
+
+.eco-footer {background:var(--card-bg);border-top:2px solid var(--border);padding:40px 8%;margin-top:60px;}
+.footer-container{display:flex;flex-wrap:wrap;justify-content:space-between;gap:40px;}
+.footer-logo{font-size:1.6rem;font-weight:700;color:var(--primary);}
+.footer-bottom{text-align:center;margin-top:25px;font-size:.85rem;opacity:.7;}
+</style>
+</head>
+
+<body>
+
+<header>
+  <a class="LOGO">EcoPath 🌱</a>
+  <nav>
+    <a href="#charts">Dashboard</a>
+    <a href="#map">Map</a>
+    <a href="./energy.html">Energy & Gas</a>
+
+    <select id="citySelect">
+      <option>Seoul</option>
+      <option>Busan</option>
+      <option>Daegu</option>
+      <option>Daejeon</option>
+      <option>Gyeonggi</option>
+      <option>Gangwon</option>
+      <option>Jeju</option>
+    </select>
+
+    <select id="langSelect">
+      <option value="en">EN</option>
+      <option value="kr">KR</option>
+      <option value="uz">UZ</option>
+    </select>
+  </nav>
+
+  <label class="switch">
+    <input type="checkbox" id="themeSwitch">
+    <span class="slider"></span>
+  </label>
+</header>
+
+<section class="hero">
+  <h1>Waste Analytics Dashboard</h1>
+</section>
+
+<section class="dashboard" id="charts">
+<div class="kpi-grid">
+  <div class="kpi"><h4>Avg / District</h4><p id="kpiAvg">-</p></div>
+  <div class="kpi"><h4>Top District</h4><p id="kpiTopDistrict">-</p></div>
+  <div class="kpi"><h4>Recycle Rate</h4><p id="kpiRecycle">-</p></div>
+</div>
+
+<div class="chart-area">
+  <div class="chart-box"><h3>Waste by District</h3><canvas id="barChart"></canvas></div>
+  <div class="chart-box"><h3>Weekly Trend</h3><canvas id="lineChart"></canvas></div>
+  <div class="chart-box"><h3>Waste Composition</h3><canvas id="pieChart"></canvas></div>
+</div>
+</section>
+
+<section class="requests" id="requests">
+  <h2 style="text-align:center;margin:50px 0 20px;color:var(--primary);">Truck Pickup Requests</h2>
+
+  <div class="table-wrapper">
+    <h3>Pending Requests</h3>
+    <table id="pendingTable">
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Pickup Date</th>
+          <th>Photo</th>
+          <th>Note</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="table-wrapper" style="margin-top:40px;">
+    <h3>Accepted / Notes</h3>
+    <table id="acceptedTable">
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Pickup Date</th>
+          <th>Note</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  
+<div id="photoModal">
+  <span id="photoModalClose">&times;</span>
+  <img id="photoModalImage" src="">
+</div>
+
+</section>
+
+<h2 style="text-align:center;margin-top:30px;">🌍 Nationwide Waste Map</h2>
+<div id="map"></div>
+
+<div style="text-align:center;margin:30px 0;">
+  <button id="downloadCSV" style="background:#f79c29;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px;">
+    📊 Export CSV
+  </button>
+  <button id="downloadXLSX" style="background:#006e55;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;">
+    📘 Export Excel
+  </button>
+</div>
+
+<footer class="eco-footer">
+  <div class="footer-container">
+    <div class="footer-section">
+      <h2 class="footer-logo">EcoPath 🌱</h2>
+      <p>Empowering sustainable cities through smart waste & energy analytics.</p>
+    </div>
+    <div class="footer-section">
+      <h3>Navigation</h3>
+      <a href="about.html">Home</a>
+      <a href="energy.html">Energy & Gas</a>
+      <a href="gas.html">Waste</a>
+    </div>
+    <div class="footer-section">
+      <h3>Contact</h3>
+      <p>📞 +82 10-0000-0000</p>
+      <p>✉️ support@ecopath.com</p>
+      <p>🌍 Seoul, South Korea</p>
+    </div>
+  </div>
+  <p class="footer-bottom">© 2025 EcoPath. All rights reserved.</p>
+</footer>
+
+<script>
+/************* API CONFIG *************/
+const API_BASE="http://localhost:8000/api/carbon-footprint-records";
+const USER_ID="b1af1a56-7051-4447-86e1-6b783fed7342";
+
+/************* GET WASTE DATA *************/
+async function getWaste(city){
+  if(city!=="Seoul") return null;
+  try{
+    const url=`${API_BASE}/${USER_ID}?month=12&year=2025`;
+    const res=await fetch(url);
+    return res.json();
+  }catch{return null;}
+}
+
+/************* GLOBAL *************/
+let barChart,lineChart,pieChart;
+let currentWaste={};
+
+/************* RENDER DASHBOARD *************/
+async function renderDashboard(city){
+  const api=await getWaste(city);
+
+  if(!api){
+    currentWaste={};
+    renderEmpty();
+    kpiAvg.textContent="0";
+    kpiTopDistrict.textContent="No data yet";
+    kpiRecycle.textContent="0%";
+    drawMap(city,false);
+    return;
+  }
+
+  const w=api.totalWaste;
+  currentWaste=w;
+
+  const keys=Object.keys(w), vals=Object.values(w);
+
+  kpiAvg.textContent=(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2)+" kg";
+  kpiTopDistrict.textContent=keys[vals.indexOf(Math.max(...vals))];
+  kpiRecycle.textContent=Math.round(
+    (w.plastic+w.paper_and_cardboard+w.glass+w.metal)/vals.reduce((a,b)=>a+b,0)*100
+  )+"%";
+
+  if(barChart) barChart.destroy();
+  if(lineChart) lineChart.destroy();
+  if(pieChart) pieChart.destroy();
+
+  barChart=new Chart(document.getElementById("barChart"),{
+    type:"bar",
+    data:{labels:keys,datasets:[{data:vals,backgroundColor:"#00a676"}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  const weekly=[...Array(7)].map(()=>Math.round(vals.reduce((s,v)=>s+v*0.9,0)));
+
+  lineChart=new Chart(document.getElementById("lineChart"),{
+    type:"line",
+    data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[
+      {data:weekly,borderColor:"#006e55",borderWidth:3,tension:.4}
+    ]},
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  pieChart=new Chart(document.getElementById("pieChart"),{
+    type:"pie",
+    data:{labels:keys,datasets:[{
+      data:vals,
+      backgroundColor:["#00C896","#6DFFB8","#D7FF4D","#FFB84C","#73848C","#A77A47"]
+    }]}
+  });
+
+  drawMap(city,true);
+}
+
+/************* EMPTY CHARTS *************/
+function renderEmpty(){
+  if(barChart) barChart.destroy();
+  if(lineChart) lineChart.destroy();
+  if(pieChart) pieChart.destroy();
+
+  barChart=new Chart(document.getElementById("barChart"),{
+    type:"bar",
+    data:{labels:["No data"],datasets:[{data:[0],backgroundColor:"#ccc"}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  lineChart=new Chart(document.getElementById("lineChart"),{
+    type:"line",
+    data:{labels:["No data"],datasets:[{data:[0],borderColor:"#ccc"}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  pieChart=new Chart(document.getElementById("pieChart"),{
+    type:"pie",
+    data:{labels:["No data"],datasets:[{data:[1],backgroundColor:"#999"}]}
+  });
+}
+
+/************* MAP 🔥 (REPLACED SECTION) *************/
+const map = L.map("map").setView([36.5,127.9],7);
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",{
+  maxZoom:18
+}).addTo(map);
+
+let heatLayer = null;
+
+function randomSeoulPoints(total){
+  const baseLat = 37.5665;
+  const baseLng = 126.9780;
+  const pts = [];
+
+  for(let i=0;i<200;i++){
+    pts.push([
+      baseLat + (Math.random()-0.5)*0.15,
+      baseLng + (Math.random()-0.5)*0.15,
+      total/200
+    ]);
+  }
+  return pts;
+}
+
+function drawMap(city,hasData){
+  if(heatLayer) map.removeLayer(heatLayer);
+
+  if(city!=="Seoul" || !hasData){
+    map.setView([36.5,127.9],7);
+    return;
+  }
+
+  const total = Object.values(currentWaste).reduce((a,b)=>a+b,0);
+
+  heatLayer = L.heatLayer(randomSeoulPoints(total),{
+    radius:35,
+    blur:20,
+    maxZoom:12
+  }).addTo(map);
+
+  map.setView([37.5665,126.9780],11);
+}
+
+/************* TRUCK REQUESTS WITH NOTE BUTTON *************/
+const mockRequests={
+  Seoul:[
+    {
+      address:"Seoul, Jongno-gu 12-45",
+      date:"2025-11-15 10:00",
+      photo:"./trash/1.jpeg",
+      note:"There are many trash bags today, please come quickly."
+    },
+    {
+      address:"Seoul, Gangnam-gu 33-21",
+      date:"2025-11-15 13:30",
+      photo:"./trash/2.jpeg",
+      note:"Please pick up before 2 PM if possible."
+    }
+  ],
+  Busan:[],Daegu:[],Daejeon:[],Gyeonggi:[],Gangwon:[],Jeju:[]
+};
+
+function loadRequests(city){
+  const pending=document.querySelector("#pendingTable tbody");
+  const accepted=document.querySelector("#acceptedTable tbody");
+  pending.innerHTML=""; accepted.innerHTML="";
+
+  const list=mockRequests[city]||[];
+
+  list.forEach(req=>{
+    const row=pending.insertRow();
+
+    row.insertCell(0).textContent=req.address;
+    row.insertCell(1).textContent=req.date;
+
+    const p=row.insertCell(2);
+    const b=document.createElement("button");
+    b.textContent="View";
+    b.className="pic-btn";
+    b.onclick = () => showPhoto(req.photo);
+    p.appendChild(b);
+
+    const noteCell=row.insertCell(3);
+    const nbtn=document.createElement("button");
+    nbtn.textContent="View Note";
+    nbtn.className="pic-btn";
+    nbtn.onclick=()=>alert(req.note);
+    noteCell.appendChild(nbtn);
+
+    const act=row.insertCell(4);
+    const accept=document.createElement("button");
+    accept.textContent="Accept";
+    accept.className="accept-btn";
+    accept.onclick=()=>acceptRequest(row,req.note);
+    act.appendChild(accept);
+  });
+}
+
+function acceptRequest(row,note){
+  const acc=document.querySelector("#acceptedTable tbody");
+  const nr=acc.insertRow();
+
+  nr.insertCell(0).textContent=row.cells[0].textContent;
+  nr.insertCell(1).textContent=row.cells[1].textContent;
+
+  const ncell=nr.insertCell(2);
+  const nbtn=document.createElement("button");
+  nbtn.textContent="View Note";
+  nbtn.className="pic-btn";
+  nbtn.onclick=()=>alert(note);
+  ncell.appendChild(nbtn);
+
+  nr.insertCell(3).textContent="Accepted";
+
+  const dcell=nr.insertCell(4);
+  const done=document.createElement("button");
+  done.textContent="Done";
+  done.className="done-btn";
+  done.onclick=()=>nr.remove();
+  dcell.appendChild(done);
+
+  row.remove();
+}
+
+/************* EXPORT *************/
+document.getElementById("downloadCSV").onclick=()=>{
+  if(!currentWaste || Object.keys(currentWaste).length===0){
+    alert("No data loaded.");
+    return;
+  }
+  const csv="Category,Amount\n"+Object.entries(currentWaste).map(([k,v])=>`${k},${v}`).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="Waste_Stats.csv";
+  a.click();
+};
+
+document.getElementById("downloadXLSX").onclick=()=>{
+  if(!currentWaste || Object.keys(currentWaste).length===0){
+    alert("No data loaded.");
+    return;
+  }
+  const ws=XLSX.utils.json_to_sheet([currentWaste]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Waste");
+  XLSX.writeFile(wb,"Waste_Stats.xlsx");
+};
+
+/************* INIT *************/
+document.addEventListener("DOMContentLoaded",()=>{
+  renderDashboard("Seoul");
+  loadRequests("Seoul");
+});
+
+function showPhoto(src){
+  const modal = document.getElementById("photoModal");
+  const img = document.getElementById("photoModalImage");
+
+  img.src = src;
+  modal.style.display = "flex";
+}
+
+document.getElementById("photoModalClose").onclick = () => {
+  document.getElementById("photoModal").style.display = "none";
+};
+
+document.getElementById("photoModal").onclick = (e) => {
+  if(e.target.id === "photoModal"){
+    document.getElementById("photoModal").style.display = "none";
+  }
+};
+
+</script>
+
+</body>
+</html>

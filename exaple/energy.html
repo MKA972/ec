@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EcoPath Energy & Gas Dashboard</title>
+
+<!-- Fonts & Libraries -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Heatmap plugin -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<style>
+/* ========= LIGHT THEME ========= */
+:root {
+  --bg: #f3f6f5;
+  --text-main: #00221c;
+  --text-secondary: #44524f;
+  --primary: #006e55;
+  --primary-light: #00a676;
+  --accent-amber: #f79c29;
+  --card-bg: #ffffff;
+  --border: #d0d8d6;
+  --shadow: rgba(0, 0, 0, 0.1);
+}
+
+/* ========= DARK THEME ========= */
+[data-theme="dark"] {
+  --bg: #0e141a;
+  --text-main: #f1f3f2;
+  --text-secondary: #a9b5b3;
+  --primary: #00c48c;
+  --primary-light: #00ffb0;
+  --accent-amber: #ffb703;
+  --card-bg: #121c25;
+  --border: #22313b;
+  --shadow: rgba(0, 0, 0, 0.6);
+}
+
+/* ========= GLOBAL ========= */
+* {
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  transition:background .3s,color .3s,border .3s;
+}
+body {
+  font-family:"Poppins",sans-serif;
+  background:var(--bg);
+  color:var(--text-main);
+  overflow-x:hidden;
+  line-height:1.6;
+}
+
+/* HEADER */
+header{
+  background:var(--card-bg);
+  position:fixed;
+  top:0;
+  width:100%;
+  padding:1rem 8%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 2px 10px var(--shadow);
+  z-index:100;
+}
+.LOGO{
+  font-weight:700;
+  font-size:1.6rem;
+  color:var(--primary);
+  text-decoration:none;
+}
+nav a{
+  color:var(--text-main);
+  text-decoration:none;
+  margin:0 1rem;
+  font-weight:500;
+}
+nav a:hover{
+  color:var(--primary-light);
+}
+select{
+  background:var(--primary);
+  color:#fff;
+  border:none;
+  padding:8px 14px;
+  border-radius:8px;
+  font-weight:600;
+  cursor:pointer;
+  margin-left:.6rem;
+}
+
+/* THEME SWITCH */
+.switch{
+  font-size:17px;
+  position:relative;
+  display:inline-block;
+  width:3.5em;
+  height:2em;
+  margin-left:1rem;
+}
+.switch input{opacity:0;width:0;height:0;}
+.slider{
+  --background:#b8b6b6;
+  position:absolute;
+  cursor:pointer;
+  top:0;left:0;right:0;bottom:0;
+  background-color:var(--background);
+  transition:.5s;
+  border-radius:25px;
+}
+.slider:before{
+  position:absolute;
+  content:"";
+  height:1.4em;
+  width:1.4em;
+  border-radius:50%;
+  left:10%;
+  bottom:15%;
+  box-shadow: inset 8px -4px 0px 0px #fff000;
+  background:var(--background);
+  transition:.5s;
+}
+input:checked + .slider{
+  background-color:#1a6249;
+}
+input:checked + .slider:before{
+  transform:translateX(100%);
+  box-shadow: inset 15px -4px 0px 15px #fff000;
+}
+
+/* HERO */
+.hero{
+  text-align:center;
+  padding:8rem 1rem 4rem;
+  background:linear-gradient(180deg,var(--bg)0%,var(--card-bg)100%);
+}
+.hero h1{
+  font-size:2.6rem;
+  font-weight:700;
+  color:var(--primary);
+  margin-bottom:1rem;
+}
+.hero p{
+  max-width:700px;
+  margin:auto;
+  color:var(--text-secondary);
+  font-size:1.1rem;
+}
+
+/* DASHBOARD */
+.dashboard{
+  padding:4rem 8%;
+}
+#chartTitle{
+  text-align:center;
+  font-size:1.9rem;
+  font-weight:600;
+  margin-bottom:2rem;
+  color:var(--text-main);
+}
+
+/* KPI */
+.kpi-row, .kpi-row2 {
+  display:flex;
+  flex-wrap:wrap;
+  gap:1.5rem;
+  justify-content:center;
+  margin-bottom:3rem; 
+}
+.kpi-card, .kpi-card2 {
+  background:var(--card-bg);
+  border-radius:12px;
+  padding:1.2rem 2rem;
+  min-width:220px;
+  text-align:center;
+  box-shadow:0 6px 14px var(--shadow);
+}
+.kpi-card h4, .kpi-card2 h4 {
+  color:var(--primary-light);
+  margin-bottom:.4rem;
+}
+.kpi-card p, .kpi-card2 p {
+  font-size:1.2rem;
+  font-weight:600;
+  color:var(--text-main);
+}
+
+/* CHART CARDS */
+.card-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+  gap:2rem;
+  margin-bottom:2rem;
+}
+.chart-card{
+  background:var(--card-bg);
+  border-radius:14px;
+  box-shadow:0 4px 12px var(--shadow);
+  padding:1.5rem;
+}
+.chart-card h3{
+  color:var(--text-main);
+  margin-bottom:1rem;
+  font-weight:600;
+}
+.chart-card canvas{
+  width:100%;
+  height:18.75rem!important;
+}
+.chart-wide{
+  width:95%;
+  margin:0 auto;
+  margin-top:30px;
+}
+.compare{ width: 50rem; max-width:100%; }
+
+/* MAP */
+#map{
+  height:70vh;
+  width:90%;
+  margin:3rem auto;
+  border-radius:14px;
+  box-shadow:0 6px 20px var(--shadow);
+  border:2px solid var(--border);
+}
+.map-controls{
+  text-align:center;
+  font-weight:600;
+  margin:1rem;
+}
+.map-controls input[type="radio"]{
+  accent-color:var(--primary-light);
+}
+
+/* FOOTER */
+.eco-footer{
+  background:var(--card-bg);
+  border-top:2px solid var(--border);
+  padding:40px 8%;
+  margin-top:60px;
+  text-decoration: none;
+}
+.footer-container{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  gap:40px;
+}
+.footer-logo{
+  font-size:1.6rem;
+  font-weight:700;
+  color:var(--primary);
+}
+.footer-bottom{
+  text-align:center;
+  margin-top:25px;
+  font-size:.85rem;
+  opacity:.7;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <a href="#" class="LOGO" data-key="logo">EcoPath 🌱</a>
+
+  <nav>
+    <a href="#charts" data-key="dashboard">Dashboard</a>
+    <a href="#map" data-key="map">Map</a>
+    <a href="#contact" data-key="contact">Contact</a>
+    <a href="./gas.html" data-key="waste">Waste</a>
+
+    <select id="citySelect">
+      <option>Seoul</option>
+      <option>Busan</option>
+      <option>Daegu</option>
+      <option>Daejeon</option>
+      <option>Gyeonggi</option>
+      <option>Gangwon</option>
+      <option>Jeju</option>
+    </select>
+
+    <select id="langSelect">
+      <option value="en">EN</option>
+      <option value="kr">KR</option>
+      <option value="uz">UZ</option>
+    </select>
+  </nav>
+
+  <label class="switch"><input type="checkbox" id="themeSwitch"><span class="slider"></span></label>
+</header>
+
+<section class="hero">
+  <h1 data-key="energy_title">EcoPath Energy & Gas Dashboard</h1>
+  <p data-key="energy_subtitle">Compare city-level energy consumption to drive sustainable policies.</p>
+</section>
+
+<section class="dashboard" id="charts">
+  <h2 id="chartTitle" data-key="chart_title">Overview (<span id="energyCityLabel">Seoul</span>)</h2>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><h4 data-key="total_energy">Total Energy Usage</h4><p id="totalEnergy">Loading...</p></div>
+    <div class="kpi-card"><h4 data-key="avg_usage">Average Usage</h4><p id="avgEnergy">Loading...</p></div>
+    <div class="kpi-card"><h4 data-key="top_district">Top District</h4><p id="topEnergyDistrict">Loading...</p></div>
+  </div>
+
+  <div class="kpi-row2">
+    <div class="kpi-card2"><h4 data-key="total_gas" style="color:#f79c29;">Total Gas Usage</h4><p id="totalGas">Loading...</p></div>
+    <div class="kpi-card2"><h4 data-key="avg_usage2" style="color:#f79c29;">Average Usage</h4><p id="avgGas">Loading...</p></div>
+    <div class="kpi-card2"><h4 data-key="top_district2" style="color:#f79c29;">Top District</h4><p id="topGasDistrict">Loading...</p></div>
+  </div>
+
+  <div class="card-grid">
+    <div class="chart-card"><h3 data-key="electricity_chart">Electricity Usage (kWh)</h3><canvas id="elecChart"></canvas></div>
+    <div class="chart-card"><h3 data-key="gas_chart">Gas Usage (m³)</h3><canvas id="gasChart"></canvas></div>
+  </div>
+
+  <div class="chart-card chart-wide compare">
+    <h3 style="text-align:center;" data-key="compare_chart">Energy vs Gas Comparison</h3>
+    <canvas id="lineCompareChart" style="height:380px!important;"></canvas>
+  </div>
+
+</section>
+
+<h2 style="text-align:center;margin-top:60px;" data-key="nation_map">🌍 Nationwide Energy Map</h2>
+<div class="map-controls">
+  <label><input type="radio" name="energyLayer" value="Electricity" checked> <span data-key="electricity">Electricity</span></label>
+  <label><input type="radio" name="energyLayer" value="Gas"> <span data-key="gas">Gas</span></label>
+</div>
+<div id="map"></div>
+
+<div style="text-align:center;margin:30px 0;">
+  <button id="downloadCSV" style="background:#f79c29;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px;">
+    📊 Export CSV
+  </button>
+  <button id="downloadXLSX" style="background:#006e55;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;">
+    📘 Export Excel
+  </button>
+</div>
+
+<footer class="eco-footer">
+  <div class="footer-container">
+    <div class="footer-section">
+      <h2 class="footer-logo" data-key="logo">EcoPath 🌱</h2>
+      <p data-key="footer_tagline">Empowering sustainable cities through smart waste & energy analytics.</p>
+    </div>
+
+    <div class="footer-section" style="text-decoration: none;">
+      <h3 data-key="navigation">Navigation</h3>
+      <a href="index.html" data-key="home">Home</a>
+      <a href="energy.html" data-key="energy">Energy & Gas</a>
+      <a href="gas.html" data-key="waste">Waste</a>
+    </div>
+
+    <div class="footer-section" id="contact">
+      <h3 data-key="contact">Contact</h3>
+      <p>📞 +82 10-0000-0000</p>
+      <p>✉️ support@ecopath.com</p>
+      <p>🌍 Seoul, South Korea</p>
+    </div>
+  </div>
+  <p class="footer-bottom" data-key="footer_rights">© 2025 EcoPath. All rights reserved.</p>
+</footer>
+
+<script>
+/******************** LANGUAGE SYSTEM ********************/
+const translations = {
+  en: {
+    logo: "EcoPath 🌱",
+    dashboard: "Dashboard",
+    map: "Map",
+    contact: "Contact",
+    waste: "Waste",
+    energy: "Energy & Gas",
+    home: "Home",
+    energy_title: "EcoPath Energy & Gas Dashboard",
+    energy_subtitle: "Compare city-level energy consumption to drive sustainable policies.",
+    chart_title: "Overview",
+    total_energy: "Total Energy Usage",
+    avg_usage: "Average Usage",
+    top_district: "Top District",
+    total_gas: "Total Gas Usage",
+    avg_usage2: "Average Usage",
+    top_district2: "Top District",
+    electricity_chart: "Electricity Usage (kWh)",
+    gas_chart: "Gas Usage (m³)",
+    compare_chart: "Energy vs Gas Comparison",
+    nation_map: "🌍 Nationwide Energy Map",
+    electricity: "Electricity",
+    gas: "Gas",
+    navigation: "Navigation",
+    footer_tagline: "Empowering sustainable cities through smart waste & energy analytics.",
+    footer_rights: "© 2025 EcoPath. All rights reserved."
+  },
+  kr: {
+    logo: "에코패스 🌱",
+    dashboard: "대시보드",
+    map: "지도",
+    contact: "연락처",
+    waste: "폐기물",
+    energy: "에너지 & 가스",
+    home: "홈",
+    energy_title: "에코패스 에너지 & 가스 대시보드",
+    energy_subtitle: "지속 가능한 정책을 위해 도시별 에너지 소비를 비교합니다.",
+    chart_title: "개요",
+    total_energy: "총 에너지 사용량",
+    avg_usage: "평균 사용량",
+    top_district: "상위 지역",
+    total_gas: "총 가스 사용량",
+    avg_usage2: "평균 사용량",
+    top_district2: "상위 지역",
+    electricity_chart: "전기 사용량 (kWh)",
+    gas_chart: "가스 사용량 (m³)",
+    compare_chart: "에너지 vs 가스 비교",
+    nation_map: "🌍 전국 에너지 지도",
+    electricity: "전기",
+    gas: "가스",
+    navigation: "내비게이션",
+    footer_tagline: "스마트 분석을 통한 지속 가능한 도시.",
+    footer_rights: "© 2025 에코패스 — 모든 권리 보유."
+  },
+  uz: {
+    logo: "EcoPath 🌱",
+    dashboard: "Panel",
+    map: "Xarita",
+    contact: "Aloqa",
+    waste: "Chiqindi",
+    energy: "Energiya & Gaz",
+    home: "Bosh sahifa",
+    energy_title: "EcoPath Energiya & Gaz Paneli",
+    energy_subtitle: "Barqaror siyosat uchun energiya tahlili.",
+    chart_title: "Umumiy ko‘rinish",
+    total_energy: "Umumiy energiya",
+    avg_usage: "O‘rtacha sarf",
+    top_district: "Eng yaxshi hudud",
+    total_gas: "Umumiy gaz sarfi",
+    avg_usage2: "O‘rtacha sarf",
+    top_district2: "Eng yaxshi hudud",
+    electricity_chart: "Elektr sarfi (kWh)",
+    gas_chart: "Gaz sarfi (m³)",
+    compare_chart: "Energiya va Gaz taqqoslash",
+    nation_map: "🌍 Respublika energiya xaritasi",
+    electricity: "Elektr",
+    gas: "Gaz",
+    navigation: "Navigatsiya",
+    footer_tagline: "Aqlli tahlillar orqali barqaror shaharlar.",
+    footer_rights: "© 2025 EcoPath — Barcha huquqlar himoyalangan."
+  }
+};
+
+let currentLang = "en";
+let currentEnergyLayer = "Electricity";
+
+/*************** CITY CONFIG (ONLY SEOUL HAS DATA) ***************/
+const cityConfigs = {
+  Seoul: {
+    realData: true,
+    elecId: "6d8a3632-3592-4107-a122-2e90e0b2cdae",
+    gasId: "32d2e62a-a99f-4956-8b7e-9d62469e900d"
+  },
+  Busan:   { realData: false },
+  Daegu:   { realData: false },
+  Daejeon: { realData: false },
+  Gyeonggi:{ realData: false },
+  Gangwon: { realData: false },
+  Jeju:    { realData: false }
+};
+
+const cityCoords = {
+  Seoul:   [37.5665, 126.9780],
+  Busan:   [35.1796, 129.0756],
+  Daegu:   [35.8714, 128.6014],
+  Daejeon: [36.3504, 127.3845],
+  Gyeonggi:[37.2636, 127.0286],
+  Gangwon: [37.8813, 127.7298],
+  Jeju:    [33.4996, 126.5312]
+};
+
+let elecChart, gasChart, lineCompareChart;
+let map, heatLayer = null;
+let lastCity = "Seoul";
+let lastData = { electricity: [], gas: [] };
+
+/******************** TRANSLATION ********************/
+function translatePage(lang) {
+  currentLang = lang;
+  document.querySelectorAll("[data-key]").forEach(el => {
+    const key = el.getAttribute("data-key");
+    if (!translations[lang] || !translations[lang][key]) return;
+
+    if (key === "chart_title") {
+      const city = document.getElementById("energyCityLabel").textContent;
+      el.innerHTML = `${translations[lang][key]} (<span id="energyCityLabel">${city}</span>)`;
+    } else {
+      el.textContent = translations[lang][key];
+    }
+  });
+}
+
+function updateChartTitleCity(city) {
+  const label = translations[currentLang]?.chart_title || "Overview";
+  const titleEl = document.getElementById("chartTitle");
+  titleEl.innerHTML = `${label} (<span id="energyCityLabel">${city}</span>)`;
+}
+
+/******************** INIT DOM ********************/
+document.addEventListener("DOMContentLoaded", () => {
+  // Language
+  const savedLang = localStorage.getItem("lang") || "en";
+  currentLang = savedLang;
+  document.getElementById("langSelect").value = savedLang;
+  translatePage(savedLang);
+
+  document.getElementById("langSelect").addEventListener("change", e => {
+    const lang = e.target.value;
+    localStorage.setItem("lang", lang);
+    translatePage(lang);
+    const currentCity = document.getElementById("citySelect").value;
+    updateChartTitleCity(currentCity);
+  });
+
+  // Theme
+  const savedTheme = localStorage.getItem("theme") || "light";
+  document.documentElement.setAttribute("data-theme", savedTheme);
+  document.getElementById("themeSwitch").checked = savedTheme === "dark";
+  document.getElementById("themeSwitch").addEventListener("change", () => {
+    const t = document.getElementById("themeSwitch").checked ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+    localStorage.setItem("theme", t);
+  });
+
+  // Map
+  initMap();
+
+  // City select
+  const citySelect = document.getElementById("citySelect");
+  citySelect.value = "Seoul";
+  updateChartTitleCity("Seoul");
+  loadEnergy("Seoul");
+
+  citySelect.addEventListener("change", e => {
+    const city = e.target.value;
+    updateChartTitleCity(city);
+    loadEnergy(city);
+  });
+
+  // Energy radio for map
+  document.querySelectorAll('input[name="energyLayer"]').forEach(el => {
+    el.addEventListener("change", e => {
+      currentEnergyLayer = e.target.value;
+      refreshHeatmap();
+    });
+  });
+
+  // Export buttons
+  document.getElementById("downloadCSV").addEventListener("click", exportCSV);
+  document.getElementById("downloadXLSX").addEventListener("click", exportXLSX);
+});
+
+/******************** API & DATA ********************/
+async function fetchEnergy(city) {
+  const cfg = cityConfigs[city];
+  if (!cfg || !cfg.realData) {
+    return { electricity: [], gas: [] };
+  }
+
+  const base = "http://localhost:8000/api/smart-meters";
+  const params = "?from=2025-10-1&to=2025-10-30&avg=true&interval=day";
+
+  const electricityAPI = `${base}/${cfg.elecId}/readings${params}`;
+  const gasAPI = `${base}/${cfg.gasId}/readings${params}`;
+
+  try {
+    const [eRes, gRes] = await Promise.all([fetch(electricityAPI), fetch(gasAPI)]);
+    const eJson = await eRes.json();
+    const gJson = await gRes.json();
+    return {
+      electricity: eJson.values || [],
+      gas: gJson.values || []
+    };
+  } catch (err) {
+    console.error("API error:", err);
+    return { electricity: [], gas: [] };
+  }
+}
+
+async function loadEnergy(city) {
+  lastCity = city;
+  document.getElementById("energyCityLabel").textContent = city;
+
+  const api = await fetchEnergy(city);
+  const eArr = api.electricity;
+  const gArr = api.gas;
+
+  if (!eArr.length || !gArr.length) {
+    showEmptyCharts();
+    updateKPIs(null, null);
+    lastData = { electricity: [], gas: [] };
+    refreshHeatmap();
+    return;
+  }
+
+  const labels = eArr.map(v => formatDateShort(v.timestamp));
+  const e = eArr.map(v => v.value);
+  const g = gArr.map(v => v.value);
+
+  drawCharts(labels, e, g);
+  updateKPIs(e, g);
+
+  lastData = { electricity: eArr, gas: gArr };
+  refreshHeatmap();
+}
+
+/******************** KPI ********************/
+function updateKPIs(e, g) {
+  if (!e || !g) {
+    document.getElementById("totalEnergy").textContent = 0;
+    document.getElementById("avgEnergy").textContent = "-";
+    document.getElementById("topEnergyDistrict").textContent = "-";
+
+    document.getElementById("totalGas").textContent = 0;
+    document.getElementById("avgGas").textContent = "-";
+    document.getElementById("topGasDistrict").textContent = "-";
+    return;
+  }
+
+  document.getElementById("totalEnergy").textContent = e.reduce((a,b)=>a+b,0).toFixed(2);
+  document.getElementById("avgEnergy").textContent = (e.reduce((a,b)=>a+b,0) / e.length).toFixed(2);
+  document.getElementById("topEnergyDistrict").textContent = Math.max(...e).toFixed(2);
+
+  document.getElementById("totalGas").textContent = g.reduce((a,b)=>a+b,0).toFixed(2);
+  document.getElementById("avgGas").textContent = (g.reduce((a,b)=>a+b,0) / g.length).toFixed(2);
+  document.getElementById("topGasDistrict").textContent = Math.max(...g).toFixed(2);
+}
+
+/******************** CHARTS ********************/
+function showEmptyCharts() {
+  destroyCharts();
+  drawEmpty(document.getElementById("elecChart"));
+  drawEmpty(document.getElementById("gasChart"));
+  drawEmpty(document.getElementById("lineCompareChart"));
+}
+
+function drawEmpty(canvas) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = "20px Poppins";
+  ctx.fillStyle = "#777";
+  ctx.textAlign = "center";
+  ctx.fillText("No Data Yet", canvas.width/2, canvas.height/2);
+}
+
+function destroyCharts() {
+  elecChart?.destroy();
+  gasChart?.destroy();
+  lineCompareChart?.destroy();
+}
+
+function drawCharts(labels, e, g) {
+  destroyCharts();
+
+  elecChart = new Chart(document.getElementById("elecChart"), {
+    type: "bar",
+    data: { labels, datasets: [{ label: "Electricity", backgroundColor: "#00a676", data: e }] }
+  });
+
+  gasChart = new Chart(document.getElementById("gasChart"), {
+    type: "bar",
+    data: { labels, datasets: [{ label: "Gas", backgroundColor: "#f79c29", data: g }] }
+  });
+
+  lineCompareChart = new Chart(document.getElementById("lineCompareChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Electricity", borderColor: "#00a676", data: e, tension: .3 },
+        { label: "Gas", borderColor: "#f79c29", data: g, tension: .3 }
+      ]
+    }
+  });
+}
+
+/******************** MAP + HEATMAP ********************/
+function initMap() {
+  map = L.map('map').setView([36.5, 127.8], 6.7);
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",{
+  maxZoom:18
+}).addTo(map);
+}
+
+function refreshHeatmap() {
+  if (!map) return;
+
+  if (heatLayer) {
+    map.removeLayer(heatLayer);
+    heatLayer = null;
+  }
+
+  // Only Seoul has data
+  if (lastCity !== "Seoul") return;
+  if (!lastData || !lastData.electricity.length || !lastData.gas.length) return;
+
+  const baseLat = 37.5665;
+  const baseLng = 126.9780;
+
+  const source = currentEnergyLayer === "Electricity"
+    ? lastData.electricity
+    : lastData.gas;
+
+  if (!source || !source.length) return;
+
+  // Create randomized points around Seoul using value as intensity
+  const heatPoints = source.map(v => {
+    const latOffset = (Math.random() - 0.5) * 0.05;
+    const lngOffset = (Math.random() - 0.5) * 0.05;
+    const intensity = v.value; // you can scale this if needed
+    return [baseLat + latOffset, baseLng + lngOffset, intensity];
+  });
+
+  heatLayer = L.heatLayer(heatPoints, {
+    radius: 35,
+    blur: 25,
+    maxZoom: 12
+  }).addTo(map);
+}
+
+/******************** EXPORT ********************/
+function exportCSV() {
+  if (!elecChart || !gasChart) return;
+  const rows = [["Date","Electricity","Gas"]];
+  elecChart.data.labels.forEach((label, i) => {
+    rows.push([
+      label,
+      elecChart.data.datasets[0].data[i],
+      gasChart.data.datasets[0].data[i]
+    ]);
+  });
+
+  const csv = rows.map(r=>r.join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "energy.csv";
+  a.click();
+}
+
+function exportXLSX() {
+  if (!elecChart || !gasChart) return;
+  const data = elecChart.data.labels.map((label,i)=>({
+    date: label,
+    electricity: elecChart.data.datasets[0].data[i],
+    gas: gasChart.data.datasets[0].data[i]
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Energy");
+  XLSX.writeFile(wb, "energy.xlsx");
+}
+
+/******************** HELPERS ********************/
+function formatDateShort(ts) {
+  const d = new Date(ts);
+  return d.toLocaleString("en-US", { month: "short", day: "numeric" });
+}
+</script>
+
+</body>
+</html>
